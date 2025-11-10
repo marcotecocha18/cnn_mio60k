@@ -175,11 +175,11 @@
               var resultados = resultadosTensor.dataSync();
               resultadosTensor.dispose();
               tensor4.dispose();
-              var mayorIndice = resultados.indexOf(Math.max.apply(null, resultados));
 
-              var clases = ['Gato', 'Perro'];
-              console.log("Prediccion", clases[mayorIndice]);
-              document.getElementById("resultado").innerHTML = clases[mayorIndice];
+              var probabilidadPerro = resultados[0];
+              var clase = probabilidadPerro >= 0.5 ? 'Perro' : 'Gato';
+              console.log("Prediccion", clase, "(perro:", probabilidadPerro.toFixed(3), ")");
+              document.getElementById("resultado").innerHTML = clase;
           }
 
           setTimeout(predecir, 150);
