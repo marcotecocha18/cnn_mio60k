@@ -43,7 +43,7 @@
             <video id="video" playsinline autoplay style="width: 1px;"></video>
             <button class="btn btn-primary mb-2" id="cambiar-camara" onclick="cambiarCamara();">Cambiar camara</button>
             <canvas id="canvas" width="400" height="400" style="max-width: 100%;"></canvas>
-            <canvas id="othercanvas" width="150" height="150" style="display: none"></canvas>
+            <canvas id="othercanvas" width="100" height="100" style="display: none"></canvas>
             <div id="resultado"></div>            
           </div>
         </div>
@@ -72,9 +72,11 @@
       //Tomar y configurar el canvas
       var canvas = document.getElementById("canvas");
       var video = document.getElementById("video");
+      var othercanvas = document.getElementById("othercanvas");
       var ctx = canvas.getContext("2d");
       var modelo = null;
-      var size = 400;
+      const size = 400;
+      const MODEL_INPUT_SIZE = 100;
       var camaras = [];
 
       var currentStream = null;
@@ -146,29 +148,33 @@
 
       function predecir() {
           if (modelo != null) {
-              //Pasar canvas a version 150x150
-              resample_single(canvas, 150, 150, othercanvas);
+              //Pasar canvas a version 100x100 para alimentar al modelo
+              resample_single(canvas, MODEL_INPUT_SIZE, MODEL_INPUT_SIZE, othercanvas);
 
               var ctx2 = othercanvas.getContext("2d");
 
-              var imgData = ctx2.getImageData(0,0,150,150);
+              var imgData = ctx2.getImageData(0,0,MODEL_INPUT_SIZE,MODEL_INPUT_SIZE);
               var arr = []; //El arreglo completo
-              var arr150 = []; //Al llegar a arr150 posiciones se pone en 'arr' como un nuevo indice
-              for (var p=0, i=0; p < imgData.data.length; p+=4) {
-                  var red = imgData.data[p]/255;
-                  var green = imgData.data[p+1]/255;
-                  var blue = imgData.data[p+2]/255;
-                  arr150.push([red, green, blue]); //Agregar al arr150 y normalizar a 0-1. Aparte queda dentro de un arreglo en el indice 0... again
-                  if (arr150.length == 150) {
-                      arr.push(arr150);
-                      arr150 = [];
+              for (var y = 0; y < MODEL_INPUT_SIZE; y++) {
+                  var fila = [];
+                  for (var x = 0; x < MODEL_INPUT_SIZE; x++) {
+                      var index = (y * MODEL_INPUT_SIZE + x) * 4;
+                      var red = imgData.data[index]/255;
+                      var green = imgData.data[index+1]/255;
+                      var blue = imgData.data[index+2]/255;
+                      var gray = (red + green + blue) / 3; //El modelo espera escala de grises
+                      fila.push([gray]);
                   }
+                  arr.push(fila);
               }
 
               arr = [arr]; //Meter el arreglo en otro arreglo por que si no tio tensorflow se enoja >:(
-              //Nah basicamente Debe estar en un arreglo nuevo en el indice 0, por ser un tensor4d en forma 1, 150, 150, 1
-              var tensor4 = tf.tensor4d(arr);
-              var resultados = modelo.predict(tensor4).dataSync();
+              //Nah basicamente Debe estar en un arreglo nuevo en el indice 0, por ser un tensor4d en forma 1, MODEL_INPUT_SIZE, MODEL_INPUT_SIZE, 1
+              var tensor4 = tf.tensor4d(arr, [1, MODEL_INPUT_SIZE, MODEL_INPUT_SIZE, 1]);
+              var resultadosTensor = modelo.predict(tensor4);
+              var resultados = resultadosTensor.dataSync();
+              resultadosTensor.dispose();
+              tensor4.dispose();
               var mayorIndice = resultados.indexOf(Math.max.apply(null, resultados));
 
               var clases = ['Gato', 'Perro'];
